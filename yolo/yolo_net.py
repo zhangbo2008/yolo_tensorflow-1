@@ -11,15 +11,22 @@ class YOLONet(object):
         self.classes = cfg.CLASSES
         self.num_class = len(self.classes)
         self.image_size = cfg.IMAGE_SIZE
-        self.cell_size = cfg.CELL_SIZE
+        self.cell_size = cfg.CELL_SIZE#表示平均分成多少分,这里是7分.
+        #这个cellsize如何体现,直接指定output_size,扔给深度网络学习.
         self.boxes_per_cell = cfg.BOXES_PER_CELL
+
+
+        #因为行列都被分成了7*7的网格,每一个网格也就是cell对应20个分类和2个box每一个box对应5个值.
+        #这5个值第一个表示是物品的概率,后4个是坐标.
         self.output_size = (self.cell_size * self.cell_size) *\
-            (self.num_class + self.boxes_per_cell * 5)
+            (self.num_class + self.boxes_per_cell * 5)     #iii
+        #比例表示把原始图片缩小多少被.才到cell
         self.scale = 1.0 * self.image_size / self.cell_size
+
         self.boundary1 = self.cell_size * self.cell_size * self.num_class
         self.boundary2 = self.boundary1 +\
             self.cell_size * self.cell_size * self.boxes_per_cell
-
+        # loss系数
         self.object_scale = cfg.OBJECT_SCALE
         self.noobject_scale = cfg.NOOBJECT_SCALE
         self.class_scale = cfg.CLASS_SCALE
@@ -29,9 +36,13 @@ class YOLONet(object):
         self.batch_size = cfg.BATCH_SIZE
         self.alpha = cfg.ALPHA
 
+
+
         self.offset = np.transpose(np.reshape(np.array(
             [np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell),
             (self.boxes_per_cell, self.cell_size, self.cell_size)), (1, 2, 0))
+        print("SELF.offset",self.offset)
+        print("SELF.offsetshap",self.offset.shape)  #SELF.offsetshap (7, 7, 2)
 
         self.images = tf.placeholder(
             tf.float32, [None, self.image_size, self.image_size, 3],
@@ -39,11 +50,15 @@ class YOLONet(object):
         self.logits = self.build_network(
             self.images, num_outputs=self.output_size, alpha=self.alpha,
             is_training=is_training)
+        print(self.logits.shape,"shape of logits!!!!!!!")  #(?, 1470) shape of logits!!!!!!!
+
 
         if is_training:
             self.labels = tf.placeholder(
                 tf.float32,
                 [None, self.cell_size, self.cell_size, 5 + self.num_class])
+            print(self.labels.shape, "shape of labels!!!!!!!")
+            #labels!!!!!!!             (?, 7, 7, 25) shape of labels!!!!!!!
             self.loss_layer(self.logits, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('total_loss', self.total_loss)
@@ -107,6 +122,10 @@ class YOLONet(object):
                     scope='dropout_35')
                 net = slim.fully_connected(
                     net, num_outputs, activation_fn=None, scope='fc_36')
+
+
+
+
         return net
 
     def calc_iou(self, boxes1, boxes2, scope='iou'):
@@ -149,6 +168,15 @@ class YOLONet(object):
 
     def loss_layer(self, predicts, labels, scope='loss_layer'):
         with tf.variable_scope(scope):
+            '''
+            核心在这里
+            
+            (?, 7, 7, 25) shape of labels!!!!!!!
+          predicts  (?,1470)
+          
+          果断直接debug来看代码.鼠标移动到相关的变量上就直接看到shpe了
+          
+            '''
             predict_classes = tf.reshape(
                 predicts[:, :self.boundary1],
                 [self.batch_size, self.cell_size, self.cell_size, self.num_class])
@@ -243,3 +271,5 @@ def leaky_relu(alpha):
     def op(inputs):
         return tf.nn.leaky_relu(inputs, alpha=alpha, name='leaky_relu')
     return op
+print(11111111)
+print(YOLONet())
